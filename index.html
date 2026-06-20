@@ -3,52 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canvas Runner Game</title>
+    <title>Neon Cyber Runner</title>
     <style>
-        body { margin: 0; background: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; color: white; font-family: sans-serif; }
-        canvas { background: #1e293b; border: 4px solid #38bdf8; border-radius: 8px; max-width: 100%; max-height: 70vh; }
-        .info { margin-top: 10px; font-size: 1.1rem; text-align: center; }
+        body { margin: 0; background: #090d16; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; color: white; font-family: 'Segoe UI', sans-serif; }
+        #scoreBoard { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; color: #38bdf8; text-shadow: 0 0 10px rgba(56,189,248,0.5); }
+        canvas { background: linear-gradient(to bottom, #1e1b4b, #0f172a); border: 3px solid #ec4899; border-radius: 16px; box-shadow: 0 0 25px rgba(236, 72, 153, 0.3); max-width: 100%; max-height: 70vh; }
+        .info { margin-top: 15px; font-size: 1rem; color: #94a3b8; text-align: center; }
     </style>
 </head>
 <body>
     <div id="scoreBoard">Score: 0 | High Score: 0</div>
     <canvas id="gameCanvas" width="800" height="400"></canvas>
-    <div class="info">Tap Screen or Press SPACEBAR to Jump</div>
+    <div class="info">Tap Canvas or Press SPACEBAR to Jump</div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-
         let score = 0;
         let highScore = localStorage.getItem('runnerHighScore') || 0;
         let gameActive = true;
 
-        let player = { x: 50, y: 320, width: 30, height: 40, vy: 0, gravity: 0.6, jumpForce: -12, isGrounded: false };
+        let player = { x: 80, y: 310, width: 35, height: 45, vy: 0, gravity: 0.65, jumpForce: -13, isGrounded: false };
         let obstacles = [];
         let spawnTimer = 0;
-        let gameSpeed = 5;
+        let gameSpeed = 6;
 
         function update() {
             if (!gameActive) return;
-
-            // Player Physics
             player.vy += player.gravity;
             player.y += player.vy;
-            if (player.y >= 320) { player.y = 320; player.vy = 0; player.isGrounded = true; }
+            if (player.y >= 305) { player.y = 305; player.vy = 0; player.isGrounded = true; }
 
-            // Obstacle Spawning
             spawnTimer++;
-            if (spawnTimer > Math.random() * 60 + 70) {
-                obstacles.push({ x: canvas.width, y: 330, width: 20, height: 30 });
+            if (spawnTimer > Math.random() * 50 + 60) {
+                let size = Math.random() * 20 + 20;
+                obstacles.push({ x: canvas.width, y: 350 - size, width: 25, height: size });
                 spawnTimer = 0;
-                if (gameSpeed < 12) gameSpeed += 0.1;
+                if (gameSpeed < 14) gameSpeed += 0.15;
             }
 
-            // Obstacle Moving & Collision
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 obstacles[i].x -= gameSpeed;
                 if (player.x < obstacles[i].x + obstacles[i].width && player.x + player.width > obstacles[i].x && player.y < obstacles[i].y + obstacles[i].height && player.y + player.height > obstacles[i].y) {
-                    gameOver();
+                    gameActive = false;
+                    if (score > highScore) { highScore = score; localStorage.setItem('runnerHighScore', highScore); }
                 }
                 if (obstacles[i].x + obstacles[i].width < 0) { obstacles.splice(i, 1); score++; }
             }
@@ -57,32 +55,37 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#475569';
-            ctx.fillRect(0, 350, canvas.width, 50); // Base Ground
+            ctx.fillStyle = '#ec4899';
+            ctx.fillRect(0, 350, canvas.width, 5); // Ground Line
 
-            ctx.fillStyle = '#38bdf8'; // Player
+            // Neon Player Character
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#38bdf8';
             ctx.fillRect(player.x, player.y, player.width, player.height);
 
-            ctx.fillStyle = '#f43f5e'; // Obstacles
+            // Cyber Obstacles
+            ctx.fillStyle = '#f43f5e';
+            ctx.shadowColor = '#f43f5e';
             obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, obs.width, obs.height));
+            ctx.shadowBlur = 0; // Reset blur
 
             if (!gameActive) {
-                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#fff';
-                ctx.font = '30px sans-serif';
-                ctx.fillText('Game Over! Tap/Press Space to Restart', 150, 200);
+                ctx.font = 'bold 28px sans-serif';
+                ctx.textAlign = "center";
+                ctx.fillText('💥 GAME OVER 💥', canvas.width/2, 180);
+                ctx.font = '18px sans-serif';
+                ctx.fillText('Tap Screen or Press Space to Restart', canvas.width/2, 230);
             }
         }
 
         function loop() { update(); draw(); requestAnimationFrame(loop); }
-        function jump() { if (player.isGrounded && gameActive) { player.vy = player.jumpForce; player.isGrounded = false; } else if (!gameActive) { restart(); } }
-        function gameOver() { gameActive = false; if (score > highScore) { highScore = score; localStorage.setItem('runnerHighScore', highScore); } }
-        function restart() { obstacles = []; score = 0; gameSpeed = 5; gameActive = true; }
-
-        window.addEventListener('keydown', (e) => { if (e.code === 'Space') jump(); });
-        canvas.addEventListener('touchstart', () => { jump(); });
-        canvas.addEventListener('mousedown', () => { jump(); });
+        function jump() { if (player.isGrounded && gameActive) { player.vy = player.jumpForce; player.isGrounded = false; } else if (!gameActive) { obstacles = []; score = 0; gameSpeed = 6; gameActive = true; } }
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); jump(); } });
+        canvas.addEventListener('click', jump);
         loop();
     </script>
 </body>
