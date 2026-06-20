@@ -5,234 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Car Runner PRO MAX</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #0b0f19; font-family: 'Arial Black', sans-serif; touch-action: none; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-
-        #ui {
-            position: absolute; top: 20px; width: 100%; text-align: center;
-            color: white; font-size: 24px; text-shadow: 0 0 10px #00ffff; pointer-events: none;
-            font-family: system-ui, sans-serif; font-weight: bold;
+        body { margin: 0; overflow: hidden; background: #0b0f19; font-family: sans-serif; }
+        canvas { display: block; width: 100vw; height: 80vh; }
+        
+        /* Control Buttons Style */
+        #controls {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 20vh;
+            display: flex;
         }
-
-        #gameOver {
-            display: none; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); background: rgba(15, 23, 42, 0.95);
-            padding: 35px; border-radius: 24px; text-align: center;
-            color: white; border: 3px solid #ff3131; z-index: 100; width: 85%; max-width: 400px;
-            box-shadow: 0 0 30px rgba(255, 49, 49, 0.4);
+        .btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid white;
+            color: white;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
         }
-
-        button {
-            padding: 15px 35px; margin-top: 25px; font-size: 20px;
-            background: linear-gradient(135deg, #ff3131, #b91c1c); color: white; border: none; border-radius: 14px;
-            font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 49, 49, 0.4);
-            transition: transform 0.1s;
-        }
-        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
 
-    <div id="ui">Score: 0 | Coins: 0</div>
-
-    <div id="gameOver">
-        <h1 style="color: #ff3131; margin: 0; font-size: 2rem; letter-spacing: 1px;">💀 CRASHED!</h1>
-        <p id="final" style="font-size: 18px; margin: 20px 0; color: #94a3b8;"></p>
-        <button onclick="restartGame()">फिर से खेलें</button>
-    </div>
-
     <canvas id="game"></canvas>
-
-    <audio id="crash" src="https://www.soundjay.com/mechanical/sounds/crash-01.mp3"></audio>
-    <audio id="coinSound" src="https://www.soundjay.com/buttons/sounds/button-09.mp3"></audio>
+    
+    <div id="controls">
+        <div class="btn" onclick="lane = 0">LEFT</div>
+        <div class="btn" onclick="lane = 1">CENTER</div>
+        <div class="btn" onclick="lane = 2">RIGHT</div>
+    </div>
 
     <script>
         const c = document.getElementById("game");
         const ctx = c.getContext("2d");
+        c.width = window.innerWidth;
+        c.height = window.innerHeight * 0.8; // Canvas ko buttons ke liye jagah di
 
-        function resizeCanvas() {
-            c.width = window.innerWidth;
-            c.height = window.innerHeight;
-        }
-        resizeCanvas();
-
-        // गेम सेटिंग्स वेरिएबल
-        let lane = 1; 
-        let carW = Math.min(c.width * 0.14, 55);
-        let carH = carW * 1.8;
+        let lane = 1;
         let score = 0;
-        let coinCount = 0;
-        let speed = 7;
-        let gameActive = true;
+        let speed = 8;
         let enemies = [];
-        let coins = [];
-        let roadStripOffset = 0;
+        let gameActive = true;
 
         function getLaneX(l) {
-            const roadWidth = c.width * 0.65;
-            const startX = c.width * 0.175;
-            const laneWidth = roadWidth / 3;
-            return startX + (l * laneWidth) + (laneWidth / 2 - carW / 2);
+            return (c.width / 3) * l + (c.width / 6) - 25;
         }
 
-        let player = { x: getLaneX(lane), y: c.height - carH - 100 };
-
-        function drawCar(x, y, color, isPlayer) {
-            ctx.save();
+        function drawCar(x, y, color) {
             ctx.fillStyle = color;
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = color;
-            
-            // Main Chassis
-            ctx.beginPath();
-            ctx.roundRect(x, y, carW, carH, 12);
-            ctx.fill();
-
-            // Glass Roof Panel
-            ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
-            ctx.shadowBlur = 0;
-            ctx.fillRect(x + carW * 0.15, y + carH * 0.25, carW * 0.7, carH * 0.35);
-
-            // Headlights / Taillights
-            ctx.fillStyle = isPlayer ? "#00ffff" : "#ffffff";
-            ctx.fillRect(x + 6, isPlayer ? y - 3 : y + carH - 3, 8, 5);
-            ctx.fillRect(x + carW - 14, isPlayer ? y - 3 : y + carH - 3, 8, 5);
-
-            ctx.restore();
+            ctx.fillRect(x, y, 50, 80);
         }
-
-        // Spawn timer logic
-        let spawnInterval = setInterval(() => {
-            if (!gameActive) return;
-            let l = Math.floor(Math.random() * 3);
-            enemies.push({ x: getLaneX(l), y: -160, lane: l });
-
-            if (Math.random() < 0.45) {
-                let cl = Math.floor(Math.random() * 3);
-                coins.push({ x: getLaneX(cl) + carW / 2, y: -100 });
-            }
-        }, 1000);
 
         function update() {
             if (!gameActive) return;
             ctx.clearRect(0, 0, c.width, c.height);
 
-            // Side Grass Terrain
-            ctx.fillStyle = "#1e3a1e";
+            // Road draw
+            ctx.fillStyle = "#333";
             ctx.fillRect(0, 0, c.width, c.height);
 
-            // Center Road Track
-            ctx.fillStyle = "#1e293b";
-            ctx.fillRect(c.width * 0.175, 0, c.width * 0.65, c.height);
-
-            // Road Track Shoulders (Left & Right Borders)
-            ctx.fillStyle = "#ef4444";
-            ctx.fillRect(c.width * 0.165, 0, c.width * 0.01, c.height);
-            ctx.fillRect(c.width * 0.825, 0, c.width * 0.01, c.height);
-
-            // Animated Road Center Strips
-            roadStripOffset += speed;
-            if (roadStripOffset > 80) roadStripOffset = 0;
-
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.setLineDash([40, 40]);
-            ctx.lineWidth = 4;
-            
-            for (let i = 1; i < 3; i++) {
-                let lineX = c.width * 0.175 + (c.width * 0.65 / 3) * i;
-                ctx.beginPath();
-                ctx.lineDashOffset = -roadStripOffset;
-                ctx.moveTo(lineX, 0); 
-                ctx.lineTo(lineX, c.height);
-                ctx.stroke();
+            if (Math.random() < 0.05) {
+                enemies.push({ x: getLaneX(Math.floor(Math.random()*3)), y: -100 });
             }
 
-            // Player Animation Render
-            player.x += (getLaneX(lane) - player.x) * 0.25; 
-            drawCar(player.x, player.y, "#00FFFF", true);
-
-            // Enemy Management Logic Loop
             enemies.forEach((e, i) => {
                 e.y += speed;
-                drawCar(e.x, e.y, "#ef4444", false);
-
-                if (Math.abs(player.x - e.x) < carW - 8 && Math.abs(player.y - e.y) < carH - 10) {
-                    endGame();
-                }
-
-                if (e.y > c.height) {
-                    enemies.splice(i, 1);
-                    score++;
-                    speed += 0.06;
-                }
-            });
-
-            // Coin Generation Tracking
-            coins.forEach((co, i) => {
-                co.y += speed;
+                drawCar(e.x, e.y, "red");
                 
-                ctx.save();
-                ctx.fillStyle = "#fbbf24";
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = "#fbbf24";
-                ctx.beginPath();
-                ctx.arc(co.x, co.y, 14, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-
-                if (Math.abs(player.x + carW / 2 - co.x) < carW / 2 + 10 && Math.abs(player.y + carH / 2 - co.y) < carH / 2 + 10) {
-                    coinCount++;
-                    try { document.getElementById("coinSound").play(); } catch(err){}
-                    coins.splice(i, 1);
+                let playerX = getLaneX(lane);
+                if (Math.abs(playerX - e.x) < 40 && Math.abs(c.height - 150 - e.y) < 70) {
+                    gameActive = false;
+                    alert("Game Over! Score: " + score);
+                    location.reload();
                 }
-                if (co.y > c.height) coins.splice(i, 1);
+                if (e.y > c.height) { enemies.splice(i, 1); score++; }
             });
 
-            document.getElementById("ui").innerText = `Score: ${score} | Coins: ${coinCount}`;
+            drawCar(getLaneX(lane), c.height - 150, "cyan");
             requestAnimationFrame(update);
         }
 
-        // 3-Lane Quick Tap Controls
-        c.addEventListener("touchstart", e => {
-            e.preventDefault();
-            if (!gameActive) return;
-            
-            let touchX = e.touches[0].clientX;
-            let roadWidth = c.width * 0.65;
-            let startX = c.width * 0.175;
-            let laneWidth = roadWidth / 3;
-
-            if (touchX < startX + laneWidth) {
-                lane = 0;
-            } else if (touchX < startX + (laneWidth * 2)) {
-                lane = 1;
-            } else {
-                lane = 2;
-            }
-        });
-
-        function endGame() {
-            gameActive = false;
-            try { document.getElementById("crash").play(); } catch(err){}
-            if (navigator.vibrate) navigator.vibrate(200);
-            document.getElementById("final").innerText = `आपका स्कोर: ${score} | सिक्के: ${coinCount}`;
-            document.getElementById("gameOver").style.display = "block";
-        }
-
-        function restartGame() {
-            enemies = [];
-            coins = [];
-            score = 0;
-            coinCount = 0;
-            speed = 7;
-            lane = 1;
-            player.x = getLaneX(lane);
-            document.getElementById("gameOver").style.display = "none";
-            gameActive = true;
-            update();
-        }
-
-        window.addEventListener('resize', resizeCanvas);
         update();
     </script>
 </body>
